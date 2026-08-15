@@ -1,0 +1,366 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>GAIL Procurement &amp; CPBG Analytics</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.0/chart.umd.min.js"></script>
+<style>
+  :root{
+    /* GAIL brand palette, sampled directly from official IEW 2027 poster */
+    --forest:#3F6B4A;       /* primary brand green -- dominant, "clean energy" identity */
+    --forest-soft:#527D5C;
+    --navy:#243450;         /* headline/heading text from poster */
+    --gold:#E8C13C;         /* logo oval + IEW sunburst accent */
+    --red:#C0392B;          /* logo mark red -- reused as risk/alert color */
+    --sage:#B9C8A2;         /* icon-circle tint from poster */
+    --bg:#F2F3E9;           /* poster's cream background */
+    --panel:#FFFFFF;
+    --line:#E1E4D6;
+    --text:#243450;
+    --muted:#66705F;
+    --teal:var(--forest);
+    --amber:var(--gold);
+    --coral:var(--red);
+    --teal-tint:#E7EFE8;
+    --amber-tint:#FBF3DC;
+    --coral-tint:#FBE7E3;
+  }
+  *{box-sizing:border-box;}
+  body{
+    margin:0; background:var(--bg); color:var(--text);
+    font-family:'Inter',-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;
+    -webkit-font-smoothing:antialiased;
+  }
+  .mono{font-family:'IBM Plex Mono',ui-monospace,Menlo,Consolas,monospace;}
+
+  .topbar{
+    background:var(--forest); color:#fff;
+    padding:18px 28px 0 28px;
+  }
+  .topbar-row{display:flex; align-items:baseline; justify-content:space-between; flex-wrap:wrap; gap:10px;}
+  .brand{display:flex; align-items:center; gap:12px;}
+  .logo-placeholder{
+    width:34px; height:34px; border-radius:50%; background:var(--gold); color:var(--navy);
+    display:flex; align-items:center; justify-content:center; font-weight:700; font-size:16px;
+    font-family:'IBM Plex Sans',sans-serif; flex-shrink:0; border:2px solid #fff;
+  }
+  .brand h1{
+    font-family:'IBM Plex Sans',sans-serif; font-weight:600; font-size:19px; margin:0; letter-spacing:.2px;
+  }
+  .brand span{color:#9FB3C8; font-size:12px;}
+  .source-tag{
+    font-size:11px; color:#9FB3C8; background:rgba(255,255,255,0.06);
+    border:1px solid rgba(255,255,255,0.14); border-radius:20px; padding:4px 12px;
+  }
+  .tabs{display:flex; gap:2px; margin-top:16px;}
+  .tab{
+    padding:10px 18px; font-size:13px; font-weight:500; color:#B9C7D6; cursor:pointer;
+    border-bottom:3px solid transparent; transition:all .15s ease; font-family:'IBM Plex Sans',sans-serif;
+  }
+  .tab:hover{color:#fff;}
+  .tab.active{color:#fff; border-bottom-color:var(--gold);}
+
+  .page{display:none; padding:24px 28px 40px 28px; max-width:1320px; margin:0 auto;}
+  .page.active{display:block;}
+
+  .kpi-row{display:grid; grid-template-columns:repeat(4,1fr); gap:14px; margin-bottom:20px;}
+  .kpi-row.three{grid-template-columns:repeat(3,1fr);}
+  .kpi{
+    background:var(--panel); border:1px solid var(--line); border-radius:10px; padding:16px 18px;
+    position:relative;
+  }
+  .kpi .label{font-size:11.5px; color:var(--muted); text-transform:uppercase; letter-spacing:.5px; font-weight:600;}
+  .kpi .value{font-family:'IBM Plex Mono',monospace; font-size:28px; font-weight:600; margin-top:6px; color:var(--navy);}
+  .kpi .sub{font-size:11.5px; color:var(--muted); margin-top:4px;}
+  .clause{
+    display:inline-block; font-size:10px; font-weight:600; color:var(--teal); background:var(--teal-tint);
+    border-radius:5px; padding:2px 7px; margin-top:8px; letter-spacing:.2px;
+  }
+
+  .grid2{display:grid; grid-template-columns:1.3fr 1fr; gap:16px; margin-bottom:16px;}
+  .grid2-even{display:grid; grid-template-columns:1fr 1fr; gap:16px; margin-bottom:16px;}
+  .panel{
+    background:var(--panel); border:1px solid var(--line); border-radius:10px; padding:18px 20px;
+  }
+  .panel h3{
+    font-family:'IBM Plex Sans',sans-serif; font-size:14px; font-weight:600; margin:0 0 2px 0; color:var(--navy);
+  }
+  .panel .desc{font-size:12px; color:var(--muted); margin-bottom:14px;}
+  canvas{max-height:280px;}
+
+  table{width:100%; border-collapse:collapse; font-size:12.5px;}
+  th{
+    text-align:left; font-size:10.5px; text-transform:uppercase; letter-spacing:.4px; color:var(--muted);
+    border-bottom:1px solid var(--line); padding:6px 8px; font-weight:600;
+  }
+  td{padding:7px 8px; border-bottom:1px solid #EEF2F5; font-family:'IBM Plex Mono',monospace; font-size:12px;}
+  tr:last-child td{border-bottom:none;}
+  .risk-pill{
+    display:inline-block; padding:2px 8px; border-radius:20px; font-weight:600; font-size:11px;
+  }
+  .risk-hi{background:var(--coral-tint); color:var(--coral);}
+  .risk-mid{background:var(--amber-tint); color:#9C6B1F;}
+  .risk-lo{background:var(--teal-tint); color:var(--teal);}
+
+  .footnote{
+    font-size:11.5px; color:var(--muted); background:#EEF2F5; border-left:3px solid var(--navy-soft);
+    padding:10px 14px; border-radius:4px; margin-top:6px; line-height:1.5;
+  }
+  .footnote b{color:var(--text);}
+</style>
+</head>
+<body>
+
+<div class="topbar">
+  <div class="topbar-row">
+    <div class="brand">
+      <div class="logo-placeholder" title="Replace with the official GAIL logo, downloaded from gailonline.com">G</div>
+      <h1>Procurement &amp; CPBG Analytics</h1>
+      <span>FY 2023-24 &ndash; 2025-26 &nbsp;|&nbsp; anonymized data</span>
+    </div>
+    <div class="source-tag">Grounded in C&amp;P Procedure Manual, 3rd Edition</div>
+  </div>
+  <div class="tabs">
+    <div class="tab active" data-page="p1">1&ensp;PO Lifecycle &amp; Bottlenecks</div>
+    <div class="tab" data-page="p2">2&ensp;Vendor Concentration &amp; Risk</div>
+    <div class="tab" data-page="p3">3&ensp;CPBG Compliance &amp; Exposure</div>
+  </div>
+</div>
+
+<!-- PAGE 1 -->
+<div class="page active" id="p1">
+  <div class="kpi-row">
+    <div class="kpi"><div class="label">Avg PR&rarr;PO Cycle</div><div class="value" id="k1v"></div><div class="sub">days, valid records only</div></div>
+    <div class="kpi"><div class="label">Avg Internal Approval Lag</div><div class="value" id="k2v"></div><div class="sub">PO Date &minus; C&amp;P Release</div></div>
+    <div class="kpi"><div class="label">Lead Time Deviation Rate</div><div class="value" id="k3v"></div><div class="sub">% of POs exceeding standard LT</div></div>
+    <div class="kpi"><div class="label">No Fixed SLA Exists</div><div class="value" style="font-size:15px; color:var(--muted);">Empirical baseline</div><div class="sub">Manual has no codified cycle target</div></div>
+  </div>
+  <div class="grid2">
+    <div class="panel">
+      <h3>Monthly Cycle Time Trend</h3>
+      <div class="desc">PR-to-PO cycle time, one line per fiscal year</div>
+      <canvas id="chartTrend"></canvas>
+    </div>
+    <div class="panel">
+      <h3>Lifecycle Funnel</h3>
+      <div class="desc">Avg days per stage &mdash; HOD &amp; C&amp;P release dates found identical in 100% of rows, so merged</div>
+      <canvas id="chartFunnel"></canvas>
+    </div>
+  </div>
+  <div class="panel">
+    <h3>Cycle Time by Order Type</h3>
+    <div class="desc">Purchasing Group and Plant are constant across all records (single-site data) &mdash; Doc. Type is the real bottleneck signal</div>
+    <canvas id="chartDocType" style="max-height:220px;"></canvas>
+  </div>
+  <div class="footnote"><b>Data quality note:</b> 6 records have logically-impossible negative cycle times (PO dated before PR) and are excluded from these averages rather than silently included.</div>
+</div>
+
+<!-- PAGE 2 -->
+<div class="page" id="p2">
+  <div class="grid2">
+    <div class="panel">
+      <h3>Top 12 Vendors by Spend</h3>
+      <div class="desc">Total PO value, all 3 years combined</div>
+      <canvas id="chartTopVendors" style="max-height:320px;"></canvas>
+    </div>
+    <div class="panel">
+      <h3>Vendor Concentration (HHI)</h3>
+      <div class="desc">Herfindahl-Hirschman Index of PO value share, by FY</div>
+      <canvas id="chartHHI"></canvas>
+      <div class="footnote" style="margin-top:12px;">2024-25 was notably more diversified (HHI 235) than 2023-24 and 2025-26 (&gt;1100 &mdash; approaching the high-concentration threshold of 2500).</div>
+    </div>
+  </div>
+  <div class="grid2">
+    <div class="panel">
+      <h3>Vendor Risk Scorecard</h3>
+      <div class="desc">Composite score = 0.6&times;avg deviation days + 0.4&times;delay rate% &nbsp;(vendors with 2+ POs only)</div>
+      <table id="riskTable">
+        <thead><tr><th>Vendor</th><th>POs</th><th>Delay Rate</th><th>Avg Deviation</th><th>Spend</th><th>Risk</th></tr></thead>
+        <tbody></tbody>
+      </table>
+    </div>
+    <div class="panel">
+      <h3>MSME Category Spend Share</h3>
+      <div class="desc">% of total PO value by vendor classification, by FY</div>
+      <canvas id="chartMSME"></canvas>
+    </div>
+  </div>
+</div>
+
+<!-- PAGE 3 -->
+<div class="page" id="p3">
+  <div class="kpi-row three">
+    <div class="kpi">
+      <div class="label">CPBG Value Compliance</div><div class="value" id="k4v"></div>
+      <div class="sub">actual % vs required 3%/10% of PO value</div>
+      <div class="clause">Clause 3.2.1A</div>
+    </div>
+    <div class="kpi">
+      <div class="label">CPBG Duration Compliance</div><div class="value" id="k5v"></div>
+      <div class="sub">Term End covers Delivery + 90 days</div>
+      <div class="clause">Clause 3.2.1 Note ii</div>
+    </div>
+    <div class="kpi">
+      <div class="label">Intimation Compliance</div><div class="value" id="k6v" style="color:var(--coral);"></div>
+      <div class="sub">detail submitted to C&amp;P within 30 days</div>
+      <div class="clause">Clause 3.2.1 Note iii</div>
+    </div>
+  </div>
+  <div class="grid2-even">
+    <div class="panel">
+      <h3>Compliance Rates by FY</h3>
+      <div class="desc">All three, measured against explicit clauses in the C&amp;P Procedure</div>
+      <canvas id="chartCompliance"></canvas>
+    </div>
+    <div class="panel">
+      <h3>Live BG Exposure</h3>
+      <div class="desc">Guarantees currently active (Start of Term &le; today &le; Term End)</div>
+      <div style="display:flex; gap:28px; margin:18px 0 20px 4px;">
+        <div><div class="label" style="font-size:11px; color:var(--muted); text-transform:uppercase;">Live Guarantees</div>
+          <div class="value mono" id="k7v" style="font-size:32px;"></div></div>
+        <div><div class="label" style="font-size:11px; color:var(--muted); text-transform:uppercase;">Total Exposure</div>
+          <div class="value mono" id="k8v" style="font-size:32px;"></div></div>
+      </div>
+      <h3 style="margin-top:6px;">Expiry Radar &mdash; next 90 days</h3>
+      <table id="expiryTable">
+        <thead><tr><th>Vendor</th><th>Term End</th><th>Days Left</th><th>Value</th></tr></thead>
+        <tbody></tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<script>
+const D = {"kpi1_avg_cycle": 118.9, "kpi1_avg_approval_lag": 25.4, "kpi1_pct_deviation": 45.5, "funnel_stages": {"PR to Approval": 84.6, "Approval to PO": 34.3, "PO to Delivery": 438.8}, "cycle_trend_by_fy": {"2023-24": [{"month": "Apr-23", "value": 184.0}, {"month": "May-23", "value": 133.8}, {"month": "Jun-23", "value": 109.0}, {"month": "Jul-23", "value": 151.3}, {"month": "Aug-23", "value": 76.4}, {"month": "Sep-23", "value": 169.1}, {"month": "Oct-23", "value": 51.2}, {"month": "Nov-23", "value": 118.7}, {"month": "Dec-23", "value": 51.6}, {"month": "Jan-24", "value": 105.5}, {"month": "Feb-24", "value": 118.1}, {"month": "Mar-24", "value": 161.5}], "2024-25": [{"month": "Apr-24", "value": 141.2}, {"month": "May-24", "value": 118.5}, {"month": "Jun-24", "value": 132.3}, {"month": "Jul-24", "value": 140.2}, {"month": "Aug-24", "value": 143.8}, {"month": "Sep-24", "value": 82.2}, {"month": "Oct-24", "value": 125.5}, {"month": "Nov-24", "value": 119.4}, {"month": "Dec-24", "value": 97.8}, {"month": "Jan-25", "value": 118.8}, {"month": "Feb-25", "value": 116.5}, {"month": "Mar-25", "value": 101.1}], "2025-26": [{"month": "Apr-25", "value": 85.0}, {"month": "May-25", "value": 87.1}, {"month": "Jun-25", "value": 136.7}, {"month": "Jul-25", "value": 220.7}, {"month": "Aug-25", "value": 59.4}, {"month": "Sep-25", "value": 112.9}, {"month": "Oct-25", "value": 103.0}, {"month": "Nov-25", "value": 100.4}, {"month": "Dec-25", "value": 160.0}]}, "cycle_by_purchasing_group": [{"group": "ZF", "days": 377.0, "n": 7}, {"group": "ZC", "days": 150.2, "n": 24}, {"group": "ZS", "days": 124.6, "n": 145}, {"group": "ZD", "days": 98.4, "n": 158}, {"group": "ZCON", "days": 95.7, "n": 3}], "top_vendors": [{"vendor": "VENDOR_023", "spend": 255974312.0}, {"vendor": "VENDOR_265", "spend": 178439633.0}, {"vendor": "VENDOR_267", "spend": 66383928.0}, {"vendor": "VENDOR_002", "spend": 60298422.0}, {"vendor": "VENDOR_280", "spend": 44566525.0}, {"vendor": "VENDOR_295", "spend": 42574780.0}, {"vendor": "VENDOR_113", "spend": 41626506.0}, {"vendor": "VENDOR_121", "spend": 41394171.0}, {"vendor": "VENDOR_012", "spend": 40236824.0}, {"vendor": "VENDOR_020", "spend": 37621111.0}, {"vendor": "VENDOR_150", "spend": 32751712.0}, {"vendor": "VENDOR_293", "spend": 30991992.0}], "hhi_by_fy": [{"fy": "2023-24", "hhi": 1243.0}, {"fy": "2024-25", "hhi": 235.0}, {"fy": "2025-26", "hhi": 1114.0}], "vendor_risk_table": [{"vendor": "VENDOR_018", "n_pos": 2, "delay_rate": 100.0, "avg_deviation": 79.0, "spend": 7549588.0, "risk_score": 87.4}, {"vendor": "VENDOR_265", "n_pos": 4, "delay_rate": 50.0, "avg_deviation": 99.0, "spend": 178439633.0, "risk_score": 79.4}, {"vendor": "VENDOR_038", "n_pos": 2, "delay_rate": 100.0, "avg_deviation": 64.5, "spend": 152349.0, "risk_score": 78.7}, {"vendor": "VENDOR_120", "n_pos": 3, "delay_rate": 100.0, "avg_deviation": 60.0, "spend": 10175884.0, "risk_score": 76.0}, {"vendor": "VENDOR_161", "n_pos": 2, "delay_rate": 100.0, "avg_deviation": 59.0, "spend": 2606597.0, "risk_score": 75.4}, {"vendor": "VENDOR_121", "n_pos": 10, "delay_rate": 100.0, "avg_deviation": 39.6, "spend": 41394171.0, "risk_score": 63.8}, {"vendor": "VENDOR_007", "n_pos": 2, "delay_rate": 100.0, "avg_deviation": 26.0, "spend": 1507324.0, "risk_score": 55.6}, {"vendor": "VENDOR_047", "n_pos": 2, "delay_rate": 100.0, "avg_deviation": 20.5, "spend": 2388136.0, "risk_score": 52.3}, {"vendor": "VENDOR_184", "n_pos": 2, "delay_rate": 100.0, "avg_deviation": 17.0, "spend": 5157772.0, "risk_score": 50.2}, {"vendor": "VENDOR_165", "n_pos": 2, "delay_rate": 100.0, "avg_deviation": 14.0, "spend": 4347760.0, "risk_score": 48.4}], "msme_by_fy": {"2023-24": {"Medium": 1.3, "Micro": 23.8, "Others": 57.8, "Small": 17.1}, "2024-25": {"Medium": 1.8, "Micro": 43.5, "Others": 32.5, "Small": 22.2}, "2025-26": {"Medium": 0.1, "Micro": 20.7, "Others": 42.0, "Small": 37.2}}, "compliance_by_fy": [{"fy": "2023-24", "value": 75.0, "duration": 85.0, "intimation": 15.0}, {"fy": "2024-25", "value": 78.4, "duration": 86.5, "intimation": 12.2}, {"fy": "2025-26", "value": 57.1, "duration": 85.7, "intimation": 21.4}], "kpi3_value_compliance": 73.2, "kpi3_duration_compliance": 85.9, "kpi3_intimation_compliance": 14.5, "live_exposure_value": 14006615.0, "live_exposure_count": 51, "expiry_radar": [{"vendor": "VENDOR_356", "term_end": "03-Sep-2026", "days": 19, "value": 30201.0}, {"vendor": "VENDOR_104", "term_end": "18-Sep-2026", "days": 34, "value": 38062.0}, {"vendor": "VENDOR_357", "term_end": "30-Sep-2026", "days": 46, "value": 29229.0}, {"vendor": "VENDOR_358", "term_end": "30-Sep-2026", "days": 46, "value": 169448.0}, {"vendor": "VENDOR_359", "term_end": "20-Oct-2026", "days": 66, "value": 98906.0}, {"vendor": "VENDOR_031", "term_end": "31-Oct-2026", "days": 77, "value": 217587.0}, {"vendor": "VENDOR_040", "term_end": "06-Nov-2026", "days": 83, "value": 47559.0}, {"vendor": "VENDOR_360", "term_end": "08-Nov-2026", "days": 85, "value": 261186.0}], "bg_timeline_summary": {"total": 71, "live_now": 51, "date_range": ["Jun-2023", "Nov-2032"]}, "cycle_breakdown_label": "Doc. Type"};
+
+const NAVY="#243450", TEAL="#3F6B4A", AMBER="#E8C13C", CORAL="#C0392B", MUTED="#66705F", LINE="#E1E4D6";
+Chart.defaults.font.family = "Inter, sans-serif";
+Chart.defaults.color = MUTED;
+Chart.defaults.font.size = 11;
+
+// ---- Tab switching ----
+document.querySelectorAll(".tab").forEach(t=>{
+  t.addEventListener("click", ()=>{
+    document.querySelectorAll(".tab").forEach(x=>x.classList.remove("active"));
+    document.querySelectorAll(".page").forEach(x=>x.classList.remove("active"));
+    t.classList.add("active");
+    document.getElementById(t.dataset.page).classList.add("active");
+  });
+});
+
+// ---- KPI values ----
+document.getElementById("k1v").textContent = D.kpi1_avg_cycle + "d";
+document.getElementById("k2v").textContent = D.kpi1_avg_approval_lag + "d";
+document.getElementById("k3v").textContent = D.kpi1_pct_deviation + "%";
+document.getElementById("k4v").textContent = D.kpi3_value_compliance + "%";
+document.getElementById("k5v").textContent = D.kpi3_duration_compliance + "%";
+document.getElementById("k6v").textContent = D.kpi3_intimation_compliance + "%";
+document.getElementById("k7v").textContent = D.live_exposure_count;
+document.getElementById("k8v").textContent = "\u20b9" + (D.live_exposure_value/100000).toFixed(1) + "L";
+
+// ---- Page 1: trend chart ----
+const fyColors = {"2023-24":MUTED, "2024-25":AMBER, "2025-26":TEAL};
+const fiscalOrder = ["Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec","Jan","Feb","Mar"];
+const trendDatasets = Object.keys(D.cycle_trend_by_fy).map(fy=>{
+  const points = D.cycle_trend_by_fy[fy];
+  const byFiscalIdx = new Array(12).fill(null);
+  points.forEach(p=>{
+    const mon = p.month.split("-")[0];
+    byFiscalIdx[fiscalOrder.indexOf(mon)] = p.value;
+  });
+  return {label:fy, data:byFiscalIdx, borderColor:fyColors[fy], backgroundColor:fyColors[fy],
+           tension:.3, spanGaps:true, pointRadius:2, borderWidth:2.5};
+});
+new Chart(document.getElementById("chartTrend"), {
+  type:"line",
+  data:{labels:fiscalOrder, datasets:trendDatasets},
+  options:{plugins:{legend:{position:"bottom", labels:{boxWidth:10, padding:12}}},
+           scales:{y:{title:{display:true, text:"Avg Cycle Days"}, grid:{color:LINE}}, x:{grid:{display:false}}}}
+});
+
+// ---- Page 1: funnel ----
+new Chart(document.getElementById("chartFunnel"), {
+  type:"bar",
+  data:{labels:Object.keys(D.funnel_stages),
+        datasets:[{data:Object.values(D.funnel_stages), backgroundColor:[NAVY,AMBER,TEAL], borderRadius:4}]},
+  options:{indexAxis:"y", plugins:{legend:{display:false}},
+           scales:{x:{title:{display:true,text:"Avg Days"}, grid:{color:LINE}}, y:{grid:{display:false}}}}
+});
+
+// ---- Page 1: doc type bottleneck ----
+new Chart(document.getElementById("chartDocType"), {
+  type:"bar",
+  data:{labels:D.cycle_by_purchasing_group.map(d=>d.group + " (n="+d.n+")"),
+        datasets:[{data:D.cycle_by_purchasing_group.map(d=>d.days), backgroundColor:CORAL, borderRadius:4}]},
+  options:{plugins:{legend:{display:false}},
+           scales:{y:{title:{display:true,text:"Avg Cycle Days"}, grid:{color:LINE}}, x:{grid:{display:false}}}}
+});
+
+// ---- Page 2: top vendors ----
+new Chart(document.getElementById("chartTopVendors"), {
+  type:"bar",
+  data:{labels:D.top_vendors.map(d=>d.vendor).reverse(),
+        datasets:[{data:D.top_vendors.map(d=>d.spend/100000).reverse(), backgroundColor:NAVY, borderRadius:3}]},
+  options:{indexAxis:"y", plugins:{legend:{display:false}},
+           scales:{x:{title:{display:true,text:"Total Spend (\u20b9 Lakhs)"}, grid:{color:LINE}}, y:{grid:{display:false}, ticks:{font:{size:10}}}}}
+});
+
+// ---- Page 2: HHI ----
+new Chart(document.getElementById("chartHHI"), {
+  type:"line",
+  data:{labels:D.hhi_by_fy.map(d=>d.fy),
+        datasets:[{data:D.hhi_by_fy.map(d=>d.hhi), borderColor:CORAL, backgroundColor:CORAL,
+                   tension:.2, pointRadius:5, borderWidth:2.5}]},
+  options:{plugins:{legend:{display:false}},
+           scales:{y:{title:{display:true,text:"HHI"}, grid:{color:LINE}}, x:{grid:{display:false}}}}
+});
+
+// ---- Page 2: risk table ----
+const riskBody = document.querySelector("#riskTable tbody");
+D.vendor_risk_table.forEach(r=>{
+  const cls = r.risk_score>=70 ? "risk-hi" : r.risk_score>=50 ? "risk-mid" : "risk-lo";
+  riskBody.innerHTML += `<tr><td class="mono" style="font-weight:600;">${r.vendor}</td><td>${r.n_pos}</td>
+    <td>${r.delay_rate}%</td><td>${r.avg_deviation}d</td><td>\u20b9${(r.spend/100000).toFixed(1)}L</td>
+    <td><span class="risk-pill ${cls}">${r.risk_score}</span></td></tr>`;
+});
+
+// ---- Page 2: MSME stacked ----
+const fys = Object.keys(D.msme_by_fy);
+const cats = ["Micro","Small","Medium","Others"];
+const catColors = {Micro:TEAL, Small:AMBER, Medium:NAVY, Others:"#C7CBB8"};
+new Chart(document.getElementById("chartMSME"), {
+  type:"bar",
+  data:{labels:fys, datasets:cats.map(c=>({label:c, data:fys.map(fy=>D.msme_by_fy[fy][c]||0),
+        backgroundColor:catColors[c]}))},
+  options:{plugins:{legend:{position:"bottom", labels:{boxWidth:10,padding:10}}},
+           scales:{x:{stacked:true, grid:{display:false}}, y:{stacked:true, title:{display:true,text:"% of Spend"}, grid:{color:LINE}}}}
+});
+
+// ---- Page 3: compliance grouped bar ----
+new Chart(document.getElementById("chartCompliance"), {
+  type:"bar",
+  data:{labels:D.compliance_by_fy.map(d=>d.fy),
+        datasets:[
+          {label:"Value", data:D.compliance_by_fy.map(d=>d.value), backgroundColor:TEAL, borderRadius:3},
+          {label:"Duration", data:D.compliance_by_fy.map(d=>d.duration), backgroundColor:AMBER, borderRadius:3},
+          {label:"Intimation", data:D.compliance_by_fy.map(d=>d.intimation), backgroundColor:CORAL, borderRadius:3},
+        ]},
+  options:{plugins:{legend:{position:"bottom", labels:{boxWidth:10,padding:12}}},
+           scales:{y:{max:100, title:{display:true,text:"Compliance %"}, grid:{color:LINE}}, x:{grid:{display:false}}}}
+});
+
+// ---- Page 3: expiry table ----
+const expBody = document.querySelector("#expiryTable tbody");
+D.expiry_radar.forEach(r=>{
+  const urgent = r.days<=30;
+  expBody.innerHTML += `<tr><td class="mono" style="font-weight:600;">${r.vendor}</td><td>${r.term_end}</td>
+    <td style="color:${urgent?'#C0392B':'inherit'}; font-weight:${urgent?'700':'400'};">${r.days}d</td>
+    <td>\u20b9${(r.value/1000).toFixed(0)}K</td></tr>`;
+});
+</script>
+
+<div style="text-align:center; padding:16px; font-size:11px; color:var(--muted); background:var(--bg); border-top:1px solid var(--line);">
+  Anonymized data &middot; Independent analytics project &mdash; not an official GAIL (India) Ltd. publication.
+</div>
+</body>
+</html>

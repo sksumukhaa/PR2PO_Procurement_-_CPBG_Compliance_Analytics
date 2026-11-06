@@ -1,14 +1,7 @@
 # PR2PO — Procurement Lifecycle & CPBG Compliance Analytics
 
-**End-to-end analytics on real PSU procurement data** — from raw Excel exports to a
-policy-audited, brand-designed Power BI dashboard. Built on 459 actual purchase orders
+**End-to-end analytics on real PSU procurement data**: Generated a policy-audited, brand-designed Power BI dashboard from raw data. Built on 459 actual purchase orders
 and 71 bank guarantee records from GAIL (India) Ltd., anonymized for public release.
-
-> Most portfolio projects analyze Airbnb listings or Titanic survival. This one analyzes
-> real government-sector procurement data against the company's own 250-page policy
-> manual — and finds a genuine compliance gap most dashboards would never surface.
-
----
 
 ## Key Findings
 
@@ -25,9 +18,9 @@ and 71 bank guarantee records from GAIL (India) Ltd., anonymized for public rele
 
 ## What Makes This Different
 
-- **Real, not synthetic, data** — actual anonymized PO and CPBG records, not a Kaggle dataset.
+- **Real data** — actual anonymized PO and CPBG records, not a Kaggle dataset.
 - **Policy-grounded, not assumption-based** — 3 of the 11 KPIs are measured directly against
-  cited clauses from GAIL's official C&P Procedure Manual, not invented benchmarks.
+  cited clauses from GAIL's official C&P Procedure Manual.
 - **Data quality treated as a finding, not a footnote** — every anomaly (duplicate columns,
   sparse fields, impossible values) is documented and resolved with a stated rationale,
   not silently dropped.
@@ -81,28 +74,6 @@ custom composite vendor risk score, MSME category spend split.
 
 Open `dashboard/gail_dashboard_branded.html` directly in a browser for the interactive
 prototype, or follow `dashboard/POWER_BI_BUILD_GUIDE.md` to build the full Power BI version.
-
----
-
-## How to Run
-
-```bash
-# 1. Clone and install dependencies
-git clone <this-repo>
-cd pr2po-procurement-analytics
-pip install pandas numpy matplotlib seaborn
-
-# 2. Run the notebooks in order
-jupyter notebook notebooks/01_data_cleaning_feature_engineering.ipynb
-jupyter notebook notebooks/02_eda_visualizations.ipynb
-
-# 3. Or query the pre-built database directly
-sqlite3 sql/gail_procurement.db < sql/analysis_queries.sql
-
-# 4. Or just open the dashboard prototype
-open dashboard/gail_dashboard_branded.html
-```
-
 ---
 
 ## Data & Privacy
